@@ -60,7 +60,7 @@ public abstract class BaseActivity extends AppCompatActivity {
     }
 
     // 界面跳转
-    protected  void navigateTo(Class<?> cls){
+    protected void navigateTo(Class<?> cls){
         startActivity(new Intent(context,cls));
     }
 }
