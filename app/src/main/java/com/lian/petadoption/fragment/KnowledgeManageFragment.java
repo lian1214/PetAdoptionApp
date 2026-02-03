@@ -27,6 +27,7 @@ import com.lian.petadoption.base.BaseRecyclerAdapter;
 import com.lian.petadoption.config.AppConfig;
 import com.lian.petadoption.dao.Knowledge;
 import com.lian.petadoption.database.DataCallback;
+import com.lian.petadoption.utils.GlideUtils;
 import com.lian.petadoption.utils.ImagePickerHelper;
 
 import java.util.ArrayList;
@@ -93,19 +94,21 @@ public class KnowledgeManageFragment extends BaseFragment {
             @Override
             public void onSuccess(List<Knowledge> data) {
                 knowledgeList.clear();
-                knowledgeList.addAll(data);
+                if (data != null) {
+                    knowledgeList.addAll(data);
+                }
                 adapter.setData(knowledgeList);
-                selectedIds.clear();
+                selectedIds.clear(); // 刷新数据时清空选中状态
                 adapter.notifyDataSetChanged();
             }
             @Override public void onFail(String msg) { showToast(msg); }
         };
 
         if (TextUtils.isEmpty(keyword)) {
-            // 需要在 DatabaseHelper 中实现 getAllKnowledge(callback)
-            // 如果没有，可以复用 searchKnowledge("", "", callback)
-            databaseHelper.getKnowledgeList("pet", callback); // 暂时只查 pet，建议实现 getAll
+            // 【核心修复】使用 getAllKnowledge 获取所有类型、所有发布者的知识
+            databaseHelper.getAllKnowledge(callback);
         } else {
+            // 搜索时，baseType 传空字符串 ""，匹配所有类型
             databaseHelper.searchKnowledge("", keyword, callback);
         }
     }
@@ -150,6 +153,7 @@ public class KnowledgeManageFragment extends BaseFragment {
                     StringBuilder sb = new StringBuilder();
                     for (Uri uri : dialogSelectedUris) sb.append(uri.toString()).append(AppConfig.IMAGE_SPLIT_SYMBOL);
 
+                    // 官方发布，isOfficial = true
                     databaseHelper.addKnowledge(finalType, "管理员", title, content, sb.toString(), true, new DataCallback<Boolean>() {
                         @Override public void onSuccess(Boolean data) { showToast("发布成功"); loadData(""); }
                         @Override public void onFail(String msg) { showToast("发布失败"); }
@@ -160,19 +164,48 @@ public class KnowledgeManageFragment extends BaseFragment {
     }
 
     private void handleBatchDelete() {
-        // 需在 DatabaseHelper 中实现 deleteKnowledge
-        // 暂时演示逻辑
-        showToast("批量删除功能需完善 DatabaseHelper");
+        // 1. 检查是否有选中项
+        if (selectedIds == null || selectedIds.isEmpty()) {
+            showToast("请先选择要删除的条目");
+            return;
+        }
+
+        // 2. 弹出确认对话框
+        new AlertDialog.Builder(mContext)
+                .setTitle("批量删除")
+                .setMessage("确定要删除选中的 " + selectedIds.size() + " 条知识吗？\n删除后相关的评论和点赞也将一并移除且无法恢复。")
+                .setPositiveButton("确定删除", (dialog, which) -> {
+                    // 3. 转换 Set 为 List
+                    List<Integer> idsToDelete = new ArrayList<>(selectedIds);
+
+                    // 4. 调用数据库删除
+                    databaseHelper.deleteKnowledgeList(idsToDelete, new DataCallback<Boolean>() {
+                        @Override
+                        public void onSuccess(Boolean data) {
+                            showToast("删除成功");
+                            selectedIds.clear();
+                            loadData(etSearch.getText().toString());
+                        }
+
+                        @Override
+                        public void onFail(String msg) {
+                            showToast(msg);
+                        }
+                    });
+                })
+                .setNegativeButton("取消", null)
+                .show();
     }
 
+    // --- Adapter ---
     // --- Adapter ---
     private class KnowledgeManageAdapter extends BaseRecyclerAdapter<Knowledge, KnowledgeManageAdapter.VH> {
         public KnowledgeManageAdapter(Context context) { super(context); }
 
         @Override
         protected VH onCreateVH(ViewGroup parent, int viewType) {
-            // 复用 item_knowledge_manage.xml (需自行创建或根据之前代码)
-            View view = LayoutInflater.from(mContext).inflate(R.layout.item_pet_manage_list, parent, false); // 暂时复用宠物布局样式
+            // 复用 item_pet_manage_list 布局
+            View view = LayoutInflater.from(mContext).inflate(R.layout.item_pet_manage_list, parent, false);
             return new VH(view);
         }
 
@@ -182,24 +215,43 @@ public class KnowledgeManageFragment extends BaseFragment {
             holder.tvInfo.setText(item.getType() + " | " + item.getUsername());
             holder.tvTime.setText(item.getTime());
 
+            // 【核心修改】加载第一张图片（封面图）
+            String cover = item.getCoverImage();
+            if (!TextUtils.isEmpty(cover)) {
+                holder.ivPic.setVisibility(View.VISIBLE);
+                GlideUtils.loadRound(mContext, cover, holder.ivPic, 4);
+            } else {
+                // 如果没有图片，可以设为 GONE 或者显示默认图
+                holder.ivPic.setVisibility(View.GONE);
+            }
+
+            // 复选框逻辑
             holder.cbSelect.setOnCheckedChangeListener(null);
             holder.cbSelect.setChecked(selectedIds.contains(item.getId()));
             holder.cbSelect.setOnCheckedChangeListener((v, isChecked) -> {
-                if(isChecked) selectedIds.add(item.getId()); else selectedIds.remove(item.getId());
+                if(isChecked) selectedIds.add(item.getId());
+                else selectedIds.remove(item.getId());
             });
         }
 
         class VH extends RecyclerView.ViewHolder {
             TextView tvTitle, tvInfo, tvTime;
             CheckBox cbSelect;
+            ImageView ivPic; // 声明图片控件
+
             public VH(View v) {
                 super(v);
-                tvTitle = v.findViewById(R.id.tv_pet_name); // 复用ID
+                tvTitle = v.findViewById(R.id.tv_pet_name);
                 tvInfo = v.findViewById(R.id.tv_pet_info);
                 tvTime = v.findViewById(R.id.tv_publish_time);
                 cbSelect = v.findViewById(R.id.item_cb_select);
-                v.findViewById(R.id.tv_status_tag).setVisibility(View.GONE); // 隐藏不需要的
-                v.findViewById(R.id.iv_pet_pic).setVisibility(View.GONE);
+
+                // 【核心修改】获取图片控件实例
+                ivPic = v.findViewById(R.id.iv_pet_pic);
+
+                // 仅隐藏不需要的“状态标签”（如：待领养），保留图片显示
+                View statusTag = v.findViewById(R.id.tv_status_tag);
+                if(statusTag != null) statusTag.setVisibility(View.GONE);
             }
         }
     }

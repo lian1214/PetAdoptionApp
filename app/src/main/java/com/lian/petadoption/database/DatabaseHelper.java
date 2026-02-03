@@ -811,6 +811,55 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         });
     }
 
+    /**
+     * 批量删除知识库文章 (级联删除评论和点赞)
+     * @param ids 要删除的知识库 ID 列表
+     */
+    public void deleteKnowledgeList(List<Integer> ids, DataCallback<Boolean> callback) {
+        executor.execute(() -> {
+            SQLiteDatabase db = getWritableDatabase();
+            db.beginTransaction(); // 开启事务
+            try {
+                for (int id : ids) {
+                    String idStr = String.valueOf(id);
+                    // 1. 删除关联的评论
+                    db.delete(TABLE_KNOWLEDGE_COMMENT, "knowledge_id=?", new String[]{idStr});
+                    // 2. 删除关联的点赞
+                    db.delete(TABLE_KNOWLEDGE_LIKE, "knowledge_id=?", new String[]{idStr});
+                    // 3. 删除文章本体
+                    db.delete(TABLE_KNOWLEDGE, COL_ID + "=?", new String[]{idStr});
+                }
+                db.setTransactionSuccessful(); // 标记事务成功
+                postSuccess(callback, true);
+            } catch (Exception e) {
+                e.printStackTrace();
+                postFail(callback, "删除失败: " + e.getMessage());
+            } finally {
+                db.endTransaction(); // 提交或回滚
+            }
+        });
+    }
+
+    /**
+     * 【新增】管理员后台：获取所有知识（不分类型，不分官方/用户）
+     */
+    public void getAllKnowledge(DataCallback<List<Knowledge>> callback) {
+        executor.execute(() -> {
+            List<Knowledge> list = new ArrayList<>();
+            SQLiteDatabase db = getReadableDatabase();
+            // 查询所有数据，按时间倒序排列 (最新的在前)
+            String sql = "SELECT * FROM " + TABLE_KNOWLEDGE + " ORDER BY time DESC";
+
+            Cursor cursor = db.rawQuery(sql, null);
+            while (cursor != null && cursor.moveToNext()) {
+                list.add(cursorToKnowledge(cursor));
+            }
+            if (cursor != null) cursor.close();
+
+            postSuccess(callback, list);
+        });
+    }
+
     // 消息通知模块
     /**
      * 获取用户所有消息 (申请人视角 + 发布者视角)
