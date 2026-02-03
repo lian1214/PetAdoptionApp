@@ -66,10 +66,9 @@
                 android:orientation="horizontal">
 
                 <ImageView
-                    android:layout_width="14dp"
-                    android:layout_height="14dp"
-                    android:src="@android:drawable/ic_menu_mylocation"
-                    app:tint="#FFD90E" />
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/i4" />
 
                 <TextView
                     android:id="@+id/tv_recommend_address"
