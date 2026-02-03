@@ -2,7 +2,6 @@ package com.lian.petadoption.activity;
 
 import android.content.Intent;
 import android.graphics.Color;
-import android.os.Bundle;
 import android.text.TextUtils;
 import android.view.View;
 import android.view.ViewGroup;
@@ -46,12 +45,6 @@ public class PetDetailActivity extends BaseActivity {
     @Override
     protected void setStatusBar() {
         getWindow().addFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
-        // 如果想要完全透明且去黑边，可以使用如下代码：
-        // Window window = getWindow();
-        // window.clearFlags(WindowManager.LayoutParams.FLAG_TRANSLUCENT_STATUS);
-        // window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
-        // window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS);
-        // window.setStatusBarColor(Color.TRANSPARENT);
     }
 
     @Override
@@ -161,9 +154,6 @@ public class PetDetailActivity extends BaseActivity {
         setText(R.id.tv_publisher_name, publisherAccount); // 默认显示账号
         setText(R.id.tv_publisher_contact, "联系电话: " + mAdopt.getPhone());
 
-        // 尝试获取发布者详细信息 (头像/昵称)
-        // 注意：DatabaseHelper 需要有 getUserInfo 且最好是异步的，这里沿用你之前的同步逻辑或放在子线程
-        // 为保持 BaseActivity 风格，这里简单处理，实际建议 DatabaseHelper 增加 getPublisherInfoAsync
         final String finalAccount = publisherAccount;
         new Thread(() -> {
             Map<String, String> info = databaseHelper.getUserInfo(finalAccount);
@@ -193,9 +183,10 @@ public class PetDetailActivity extends BaseActivity {
         } else {
             btnApply.setText("申请领养");
             btnApply.setEnabled(true);
-            // btnApply.setBackgroundTintList(...) // 如果需要恢复颜色
         }
     }
+
+    // --- 修改：使用 setSelected 控制 Selector 图标 ---
 
     private void checkFavoriteStatus() {
         String currentAccount = sharedPreferences.getString(AppConfig.SP.USER_ACCOUNT, "");
@@ -211,7 +202,8 @@ public class PetDetailActivity extends BaseActivity {
                         break;
                     }
                 }
-                updateFavIcon(isFav);
+                // 【核心修改】通过 Selected 状态驱动 Selector 切换图片
+                btnFav.setSelected(isFav);
             }
 
             @Override
@@ -231,7 +223,8 @@ public class PetDetailActivity extends BaseActivity {
             @Override
             public void onSuccess(Boolean isNowFavorite) {
                 isFav = isNowFavorite;
-                updateFavIcon(isFav);
+                // 【核心修改】更新 Selected 状态
+                btnFav.setSelected(isFav);
                 showToast(isFav ? "收藏成功" : "已取消收藏");
             }
 
@@ -242,18 +235,9 @@ public class PetDetailActivity extends BaseActivity {
         });
     }
 
-    private void updateFavIcon(boolean isFavorite) {
-        if (isFavorite) {
-            btnFav.setImageResource(android.R.drawable.btn_star_big_on);
-            btnFav.setColorFilter(Color.parseColor("#FFD90E"));
-        } else {
-            btnFav.setImageResource(android.R.drawable.btn_star_big_off);
-            btnFav.setColorFilter(Color.parseColor("#A4B0BE"));
-        }
-    }
+    // ------------------------------------------------
 
     private void handleApply() {
-        // 使用统一的 Key 获取账号
         String currentAccount = sharedPreferences.getString(AppConfig.SP.USER_ACCOUNT, "");
 
         if (TextUtils.isEmpty(currentAccount)) {
@@ -261,15 +245,11 @@ public class PetDetailActivity extends BaseActivity {
             return;
         }
 
-        // 跳转到申请填写页
         Intent intent = new Intent(this, ApplicationActivity.class);
         intent.putExtra(AppConfig.Extra.ADOPT_DATA, mAdopt);
         startActivity(intent);
     }
 
-    /**
-     * 辅助设置文本的方法，防止空指针
-     */
     private void setText(int viewId, String text) {
         TextView tv = findViewById(viewId);
         if (tv != null) {
@@ -277,7 +257,6 @@ public class PetDetailActivity extends BaseActivity {
         }
     }
 
-    // 图片轮播适配器
     private class ImageBannerAdapter extends RecyclerView.Adapter<ImageBannerAdapter.BannerViewHolder> {
         private String[] imagePaths;
 
@@ -298,10 +277,9 @@ public class PetDetailActivity extends BaseActivity {
 
         @Override
         public void onBindViewHolder(@NonNull BannerViewHolder holder, int position) {
-            // 这里直接使用 Glide 加载，确保图片能显示
             com.bumptech.glide.Glide.with(PetDetailActivity.this)
                     .load(imagePaths[position])
-                    .placeholder(R.drawable.tab_icon1_2) // 占位图
+                    .placeholder(R.drawable.tab_icon1_2)
                     .into((ImageView) holder.itemView);
         }
 

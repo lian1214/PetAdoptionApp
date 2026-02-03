@@ -327,13 +327,17 @@
         android:gravity="center_vertical"
         android:orientation="horizontal"
         android:paddingHorizontal="20dp">
+
         <ImageButton
             android:id="@+id/btn_fav"
             android:layout_width="54dp"
             android:layout_height="54dp"
             android:background="@drawable/btn_secondary1_bg"
-            android:src="@android:drawable/btn_star_big_off"
-            app:tint="#A4B0BE" />
+            android:src="@drawable/btn_selector_save"
+
+            android:scaleType="fitCenter"
+            android:padding="2dp" />
+
         <Button
             android:id="@+id/btn_apply"
             android:layout_width="0dp"
