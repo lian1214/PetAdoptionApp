@@ -73,7 +73,7 @@ public class KnowledgeDetailActivity extends BaseActivity {
     @Override
     protected void initData() {
         currentUserName = sharedPreferences.getString(AppConfig.SP.USER_ACCOUNT, "");
-        knowledge = (Knowledge) getIntent().getSerializableExtra("k_data"); // 保持 key 不变
+        knowledge = (Knowledge) getIntent().getSerializableExtra(AppConfig.Extra.KNOWLEDGE_DATA);
 
         if (knowledge == null) {
             showToast("数据异常");

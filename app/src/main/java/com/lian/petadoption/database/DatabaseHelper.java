@@ -654,23 +654,51 @@ public class DatabaseHelper extends SQLiteOpenHelper {
     /**
      * 首页知识推荐（随机获取）
      */
+    // 1. 修改 getKnowledgeList 方法
     public void getKnowledgeList(String baseType, DataCallback<List<Knowledge>> callback) {
         executor.execute(() -> {
             List<Knowledge> list = new ArrayList<>();
-            SQLiteDatabase db = this.getReadableDatabase();
+            SQLiteDatabase db = getReadableDatabase();
 
-            // 关键修改：WHERE type = 'pet' OR type LIKE 'pet:%'
+            // 【修改点】把 = 改为 LIKE，支持匹配 "pet:xxx"
             String sql = "SELECT * FROM " + TABLE_KNOWLEDGE +
                     " WHERE type = ? OR type LIKE ? " +
                     " ORDER BY is_official DESC, _id DESC";
 
-            // 参数对应：精确匹配 baseType，或者匹配以 "baseType:" 开头的
+            // 参数：匹配 "pet" 或者 "pet:%"
             Cursor cursor = db.rawQuery(sql, new String[]{baseType, baseType + ":%"});
 
-            while (cursor != null && cursor.moveToNext()) {
+            while (cursor.moveToNext()) {
                 list.add(cursorToKnowledge(cursor));
             }
-            if(cursor != null) cursor.close();
+            cursor.close();
+            postSuccess(callback, list);
+        });
+    }
+
+    // 2. 修改 searchKnowledge 方法
+    public void searchKnowledge(String baseType, String keyword, DataCallback<List<Knowledge>> callback) {
+        executor.execute(() -> {
+            List<Knowledge> list = new ArrayList<>();
+            SQLiteDatabase db = getReadableDatabase();
+
+            // 【修改点】把 type 匹配改为 LIKE
+            String sql = "SELECT * FROM " + TABLE_KNOWLEDGE +
+                    " WHERE type LIKE ? AND (title LIKE ? OR content LIKE ? OR type LIKE ?) " +
+                    " ORDER BY is_official DESC, _id DESC";
+
+            String[] args = new String[]{
+                    baseType + "%", // 匹配 pet%
+                    "%" + keyword + "%",
+                    "%" + keyword + "%",
+                    "%" + keyword + "%"
+            };
+
+            Cursor cursor = db.rawQuery(sql, args);
+            while (cursor.moveToNext()) {
+                list.add(cursorToKnowledge(cursor));
+            }
+            cursor.close();
             postSuccess(callback, list);
         });
     }
@@ -689,31 +717,6 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             long ret = db.insert(TABLE_KNOWLEDGE, null, cv);
             if (ret != -1 && callback != null) postSuccess(callback, true);
             else if (callback != null) postFail(callback, "发布失败");
-        });
-    }
-
-    public void searchKnowledge(String baseType, String keyword, DataCallback<List<Knowledge>> callback) {
-        executor.execute(() -> {
-            List<Knowledge> list = new ArrayList<>();
-            SQLiteDatabase db = getReadableDatabase();
-
-            // 关键修改：type LIKE 'pet%' 匹配 'pet' 和 'pet:xxx'
-            String sql = "SELECT * FROM " + TABLE_KNOWLEDGE +
-                    " WHERE type LIKE ? AND (title LIKE ? OR content LIKE ? OR type LIKE ?) " +
-                    " ORDER BY is_official DESC, _id DESC";
-
-            // 参数：type前缀，标题关键词，内容关键词，标签关键词
-            String[] args = new String[]{
-                    baseType + "%",
-                    "%" + keyword + "%",
-                    "%" + keyword + "%",
-                    "%" + keyword + "%"
-            };
-
-            Cursor cursor = db.rawQuery(sql, args);
-            while (cursor.moveToNext()) list.add(cursorToKnowledge(cursor));
-            cursor.close();
-            postSuccess(callback, list);
         });
     }
 

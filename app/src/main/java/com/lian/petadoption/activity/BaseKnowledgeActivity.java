@@ -1,5 +1,6 @@
 package com.lian.petadoption.activity;
 
+import android.content.Intent;
 import android.net.Uri;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
@@ -57,7 +58,15 @@ public abstract class BaseKnowledgeActivity extends BaseActivity {
         // 初始化列表
         RecyclerView rv = findViewById(R.id.rv_knowledge_list);
         rv.setLayoutManager(new LinearLayoutManager(this));
-        adapter = new KnowledgeAdapter(this, mList);
+        adapter = new KnowledgeAdapter(this);
+
+        adapter.setOnItemClickListener((knowledge, position) -> {
+            Intent intent = new Intent(this, KnowledgeDetailActivity.class);
+            // 传入数据对象，Key 建议使用 AppConfig 中定义的常量，或者保持与详情页接收时一致
+            intent.putExtra(AppConfig.Extra.KNOWLEDGE_DATA, knowledge);
+            startActivity(intent);
+        });
+
         rv.setAdapter(adapter);
 
         // 发布按钮
@@ -77,13 +86,24 @@ public abstract class BaseKnowledgeActivity extends BaseActivity {
     }
 
     protected void loadData(String keyword) {
-        mList.clear();
+        // 注意：这里先不要清空 mList，等数据回来再说
+
         DataCallback<List<Knowledge>> callback = new DataCallback<List<Knowledge>>() {
             @Override
             public void onSuccess(List<Knowledge> data) {
-                mList.addAll(data);
-                adapter.notifyDataSetChanged();
-                if (data.isEmpty() && !TextUtils.isEmpty(keyword)) {
+                // ==========================================
+                // 【核心修改】 必须调用 adapter.setData(data) !!!
+                // 这样 BaseRecyclerAdapter 内部的数据才会更新
+                // ==========================================
+                if (adapter != null) {
+                    adapter.setData(data);
+                }
+
+                // (可选) 同步更新本地 mList 方便调试，但显示主要靠 adapter
+                mList.clear();
+                if (data != null) mList.addAll(data);
+
+                if ((data == null || data.isEmpty()) && !TextUtils.isEmpty(keyword)) {
                     showToast("未找到相关内容");
                 }
             }

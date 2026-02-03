@@ -1,6 +1,8 @@
 package com.lian.petadoption.activity;
 
+import com.lian.petadoption.dao.Knowledge;
 import com.lian.petadoption.database.DataCallback;
+import java.util.List;
 
 public class PetKnowledgeActivity extends BaseKnowledgeActivity {
 
@@ -16,19 +18,33 @@ public class PetKnowledgeActivity extends BaseKnowledgeActivity {
 
     @Override
     protected void initDefaultDataIfNeeded() {
-        // 检查是否为空，如果为空则插入一条默认数据
-        databaseHelper.getKnowledgeList(getKnowledgeType(), new DataCallback<java.util.List<com.lian.petadoption.dao.Knowledge>>() {
+        // 1. 先查
+        databaseHelper.getKnowledgeList(getKnowledgeType(), new DataCallback<List<Knowledge>>() {
             @Override
-            public void onSuccess(java.util.List<com.lian.petadoption.dao.Knowledge> data) {
-                if (data.isEmpty()) {
-                    databaseHelper.addKnowledge("pet:医疗", "系统医生", "狗狗换季感冒预防",
-                            "注意早晚温差，不要让狗狗直接睡地板...", "", true, null);
-                    // 重新加载显示出来
-                    loadData("");
+            public void onSuccess(List<Knowledge> data) {
+                // 2. 如果没数据，就插入
+                if (data == null || data.isEmpty()) {
+                    insertDefaultData();
                 }
+                // 如果有数据，loadData会自动处理显示，这里不用管
             }
             @Override
-            public void onFail(String msg) {}
+            public void onFail(String msg) {
+                insertDefaultData();
+            }
         });
+    }
+
+    private void insertDefaultData() {
+        databaseHelper.addKnowledge("pet:医疗", "系统医生", "狗狗换季感冒预防",
+                "注意早晚温差...", "", true, new DataCallback<Boolean>() {
+                    @Override
+                    public void onSuccess(Boolean data) {
+                        // 【重点】插入成功后，手动刷新列表
+                        loadData("");
+                    }
+                    @Override
+                    public void onFail(String msg) {}
+                });
     }
 }

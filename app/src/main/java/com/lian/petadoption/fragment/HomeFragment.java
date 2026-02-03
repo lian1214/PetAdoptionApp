@@ -82,8 +82,7 @@ public class HomeFragment extends BaseFragment {
         // 知识点击 -> 详情 (这里补充了跳转逻辑)
         knowledgeAdapter.setOnItemClickListener((knowledge, pos) -> {
             Intent intent = new Intent(mContext, KnowledgeDetailActivity.class);
-            // 假设 KnowledgeDetail 接收 "k_data" 或使用 AppConfig 定义的 Key
-            intent.putExtra("k_data", knowledge);
+            intent.putExtra(AppConfig.Extra.KNOWLEDGE_DATA, knowledge);
             startActivity(intent);
         });
 
