@@ -121,10 +121,9 @@
 
                 <ImageView
                     android:id="@+id/iv_like"
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@android:drawable/btn_star_big_off"
-                    app:tint="#888888" />
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:src="@drawable/btn_selector_like" />
 
                 <TextView
                     android:id="@+id/tv_like_count"

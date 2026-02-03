@@ -144,9 +144,19 @@ public class CheckInDetailActivity extends BaseActivity {
         boolean isLiked = databaseHelper.isCheckInLiked(punch.getId(), currentUserName);
 
         tvLikeCount.setText(String.valueOf(count));
-        ivLike.setImageResource(isLiked ? android.R.drawable.btn_star_big_on : android.R.drawable.btn_star_big_off);
-        if (isLiked) ivLike.setColorFilter(Color.parseColor("#FFD90E"));
-        else ivLike.clearColorFilter();
+
+        // 【修改点】使用 Selector 状态切换，无需手动 setImageResource
+        ivLike.setSelected(isLiked);
+
+        // 如果您的 like1 图片自带颜色，这里不需要 setColorFilter，否则颜色会叠加
+        // 这里假设您的 like1 是红色的图片，所以去掉滤镜代码，仅改变文字颜色
+        if (isLiked) {
+            tvLikeCount.setTextColor(Color.parseColor("#FFD90E")); // 文字变色
+            ivLike.clearColorFilter(); // 清除旧代码可能留下的滤镜
+        } else {
+            tvLikeCount.setTextColor(Color.parseColor("#333333")); // 文字恢复黑色
+            ivLike.clearColorFilter();
+        }
     }
 
     private void toggleLike() {

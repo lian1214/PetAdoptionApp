@@ -130,15 +130,22 @@ public class KnowledgeDetailActivity extends BaseActivity {
     }
 
     private void refreshLikeUI() {
-        // 假设 DatabaseHelper 已经按照之前的模式实现了这两个同步方法
-        // 如果报错，请确保在 DatabaseHelper 中添加了 getKnowledgeLikeCount 和 isKnowledgeLiked
         int count = databaseHelper.getKnowledgeLikeCount(knowledge.getId());
         boolean isLiked = databaseHelper.isKnowledgeLiked(knowledge.getId(), currentUserName);
 
         tvLikeCount.setText(String.valueOf(count));
-        ivLike.setImageResource(isLiked ? android.R.drawable.btn_star_big_on : android.R.drawable.btn_star_big_off);
-        if (isLiked) ivLike.setColorFilter(Color.parseColor("#FFD90E"));
-        else ivLike.clearColorFilter();
+
+        // 【修改点】使用 Selector 切换图片
+        ivLike.setSelected(isLiked);
+
+        // 更新文字颜色 (假设您的选中图是亮色，未选中是深色)
+        if (isLiked) {
+            tvLikeCount.setTextColor(Color.parseColor("#FFD90E"));
+            ivLike.clearColorFilter();
+        } else {
+            tvLikeCount.setTextColor(Color.parseColor("#333333"));
+            ivLike.clearColorFilter();
+        }
     }
 
     private void toggleLike() {

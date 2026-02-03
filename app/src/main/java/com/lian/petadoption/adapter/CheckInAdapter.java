@@ -34,7 +34,7 @@ public class CheckInAdapter extends BaseRecyclerAdapter<CheckIn, CheckInAdapter.
         super(context);
         this.mode = mode;
         this.dbHelper = new DatabaseHelper(context);
-        this.currentUserName = context.getSharedPreferences("User", Context.MODE_PRIVATE).getString("name", "");
+        this.currentUserName = context.getSharedPreferences("User_Preferences", Context.MODE_PRIVATE).getString("sp_account", "");
         setData(list);
     }
 
@@ -90,14 +90,13 @@ public class CheckInAdapter extends BaseRecyclerAdapter<CheckIn, CheckInAdapter.
                         @Override
                         public void onFail(String msg) {
                             // 可选：提示失败
-                            // Toast.makeText(mContext, "操作失败", Toast.LENGTH_SHORT).show();
                         }
                     });
                 });
             }
         }
 
-        // 跳转详情 (BaseRecyclerAdapter 也可以设置 OnItemClickListener，这里保留你的原有逻辑)
+        // 跳转详情
         holder.itemView.setOnClickListener(v -> {
             Intent intent = new Intent(mContext, CheckInDetailActivity.class);
             intent.putExtra("punch_data", item);
@@ -107,18 +106,22 @@ public class CheckInAdapter extends BaseRecyclerAdapter<CheckIn, CheckInAdapter.
 
     private void refreshLikeUI(ViewHolder holder, int punchId) {
         if (holder.ivLike == null || holder.tvLikeCount == null) return;
-        int count = dbHelper.getCheckInLikeCount(punchId); // 需确保 Helper 有此方法
-        boolean liked = dbHelper.isCheckInLiked(punchId, currentUserName); // 需确保 Helper 有此方法
+        int count = dbHelper.getCheckInLikeCount(punchId);
+        boolean liked = dbHelper.isCheckInLiked(punchId, currentUserName);
 
         holder.tvLikeCount.setText(String.valueOf(count));
+
+        // 【修改点】使用 Selector
+        holder.ivLike.setSelected(liked);
+
         if (liked) {
-            holder.ivLike.setImageResource(android.R.drawable.btn_star_big_on);
-            holder.ivLike.setColorFilter(Color.parseColor("#FFD90E"));
+            // 选中状态：文字变色，清除滤镜(显示原图like1)
             holder.tvLikeCount.setTextColor(Color.parseColor("#FFD90E"));
-        } else {
-            holder.ivLike.setImageResource(android.R.drawable.btn_star_big_off);
             holder.ivLike.clearColorFilter();
+        } else {
+            // 未选中状态：文字黑色，清除滤镜(显示原图like0)
             holder.tvLikeCount.setTextColor(Color.parseColor("#333333"));
+            holder.ivLike.clearColorFilter();
         }
     }
 
