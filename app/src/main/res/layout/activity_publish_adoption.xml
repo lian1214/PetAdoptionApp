@@ -1,0 +1,253 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#F8F8F8"
+    android:orientation="vertical">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/primary_color"
+        android:elevation="4dp"
+        android:paddingHorizontal="16dp">
+
+        <ImageView
+            android:id="@+id/iv_back"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_centerVertical="true"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:padding="4dp"
+            android:src="@android:drawable/ic_menu_revert"
+            app:tint="#FFFFFF" />
+
+        <TextView
+            android:id="@+id/tv_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_centerInParent="true"
+            android:text="发布送养"
+            android:textColor="#FFFFFF"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+    </RelativeLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scrollbars="none">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="20dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="🐾 宝贝照片"
+                    android:textColor="#333333"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:text="(支持多选，长按可删除)"
+                    android:textColor="#999999"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="12dp">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/rv_selected_images"
+                    android:layout_width="wrap_content"
+                    android:layout_height="100dp"
+                    android:orientation="horizontal" />
+
+                <androidx.cardview.widget.CardView
+                    android:id="@+id/iv_add_pic_container"
+                    android:layout_width="100dp"
+                    android:layout_height="100dp"
+                    app:cardCornerRadius="8dp"
+                    app:cardElevation="0dp"
+                    app:cardBackgroundColor="#FDF3AC">
+                    <ImageView
+                        android:id="@+id/iv_add_pic"
+                        android:layout_width="match_parent"
+                        android:layout_height="match_parent"
+                        android:scaleType="center"
+                        android:src="@android:drawable/ic_menu_add"
+                        app:tint="#FFD90E" />
+                </androidx.cardview.widget.CardView>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="📝 基本信息"
+                android:textColor="#333333"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:layout_marginTop="28dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/shape_card_bg"
+                android:padding="12dp">
+
+                <EditText
+                    android:id="@+id/et_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:background="@drawable/shape_card_bg"
+                    android:hint="宠物名字"
+                    android:paddingHorizontal="15dp"
+                    android:textSize="14sp"/>
+
+                <EditText
+                    android:id="@+id/et_breed"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/shape_card_bg"
+                    android:hint="品种（如：布偶猫、金毛）"
+                    android:paddingHorizontal="15dp"
+                    android:textSize="14sp"/>
+
+                <EditText
+                    android:id="@+id/et_age"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/shape_card_bg"
+                    android:hint="年龄（如：3个月、约1年）"
+                    android:paddingHorizontal="15dp"
+                    android:textSize="14sp"/>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="🏥 健康状况"
+                android:textColor="#333333"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:layout_marginTop="28dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/shape_card_bg"
+                android:padding="12dp">
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="性别" android:textSize="13sp" android:textColor="#888888"/>
+                <RadioGroup android:id="@+id/rg_gender" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="4dp">
+                    <RadioButton android:id="@+id/rb_male" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="弟弟" android:buttonTint="#FFD90E" android:layout_marginEnd="30dp"/>
+                    <RadioButton android:id="@+id/rb_female" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="妹妹" android:buttonTint="#FFD90E" />
+                </RadioGroup>
+
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F8F8F8" android:layout_marginVertical="8dp"/>
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="绝育" android:textSize="13sp" android:textColor="#888888"/>
+                <RadioGroup android:id="@+id/rg_sterilization" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="4dp">
+                    <RadioButton android:id="@+id/rb_ste_yes" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="已绝育" android:buttonTint="#FFD90E" android:layout_marginEnd="15dp"/>
+                    <RadioButton android:id="@+id/rb_ste_no" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="未绝育" android:buttonTint="#FFD90E" android:layout_marginEnd="15dp"/>
+                    <RadioButton android:id="@+id/rb_ste_unknown" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="未知" android:checked="true" android:buttonTint="#FFD90E" />
+                </RadioGroup>
+
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F8F8F8" android:layout_marginVertical="8dp"/>
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="疫苗情况" android:textSize="13sp" android:textColor="#888888"/>
+                <RadioGroup android:id="@+id/rg_vaccine" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="4dp">
+                    <RadioButton android:id="@+id/rb_vac_yes" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="已接种" android:buttonTint="#FFD90E" android:layout_marginEnd="15dp"/>
+                    <RadioButton android:id="@+id/rb_vac_no" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="未接种" android:buttonTint="#FFD90E" android:layout_marginEnd="15dp"/>
+                    <RadioButton android:id="@+id/rb_vac_unknown" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="未知" android:checked="true" android:buttonTint="#FFD90E" />
+                </RadioGroup>
+
+                <View android:layout_width="match_parent" android:layout_height="1dp" android:background="#F8F8F8" android:layout_marginVertical="8dp"/>
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="驱虫情况" android:textSize="13sp" android:textColor="#888888"/>
+                <RadioGroup android:id="@+id/rg_deworming" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginTop="4dp">
+                    <RadioButton android:id="@+id/rb_dew_yes" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="已驱虫" android:buttonTint="#FFD90E" android:layout_marginEnd="15dp"/>
+                    <RadioButton android:id="@+id/rb_dew_no" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="未驱虫" android:buttonTint="#FFD90E" android:layout_marginEnd="15dp"/>
+                    <RadioButton android:id="@+id/rb_dew_unknown" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="未知" android:checked="true" android:buttonTint="#FFD90E" />
+                </RadioGroup>
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="💡 领养要求"
+                android:textColor="#333333"
+                android:textSize="15sp"
+                android:textStyle="bold"
+                android:layout_marginTop="28dp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="12dp"
+                android:background="@drawable/shape_card_bg"
+                android:padding="12dp">
+
+                <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:gravity="center_vertical" android:layout_marginBottom="8dp">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="打卡周期" android:textSize="13sp" android:textColor="#888888" />
+                    <ImageView android:id="@+id/iv_cycle_help" android:layout_width="14dp" android:layout_height="14dp" android:layout_marginStart="5dp" android:src="@android:drawable/ic_menu_help" app:tint="#FFD90E" />
+                </LinearLayout>
+                <EditText android:id="@+id/et_cycle" android:layout_width="match_parent" android:layout_height="48dp" android:background="@drawable/shape_card_bg" android:hint="如：每周一次" android:paddingHorizontal="15dp" android:textSize="14sp" />
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="详细地址" android:textSize="13sp" android:textColor="#888888" android:layout_marginTop="12dp" android:layout_marginBottom="8dp"/>
+                <EditText android:id="@+id/et_address" android:layout_width="match_parent" android:layout_height="48dp" android:background="@drawable/shape_card_bg" android:hint="例：上海市徐汇区XX路" android:paddingHorizontal="15dp" android:textSize="14sp" />
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="联系电话" android:textSize="13sp" android:textColor="#888888" android:layout_marginTop="12dp" android:layout_marginBottom="8dp"/>
+                <EditText android:id="@+id/et_phone" android:layout_width="match_parent" android:layout_height="48dp" android:background="@drawable/shape_card_bg" android:hint="请输入联系电话" android:inputType="phone" android:paddingHorizontal="15dp" android:textSize="14sp" />
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="宝贝故事 / 领养说明" android:textSize="13sp" android:textColor="#888888" android:layout_marginTop="12dp" android:layout_marginBottom="8dp"/>
+                <EditText
+                    android:id="@+id/et_remark"
+                    android:layout_width="match_parent"
+                    android:layout_height="120dp"
+                    android:background="@drawable/shape_card_bg"
+                    android:hint="描述一下毛孩子的性格，或者对领养人的期望..."
+                    android:gravity="top"
+                    android:padding="12dp"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <androidx.appcompat.widget.AppCompatButton
+                android:id="@+id/btn_publish"
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="32dp"
+                android:layout_marginBottom="30dp"
+                android:background="@drawable/btn_primary_bg"
+                android:text="立即发布"
+                android:textColor="#333333"
+                android:textSize="17sp"
+                android:textStyle="bold"
+                android:stateListAnimator="@null" />
+
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

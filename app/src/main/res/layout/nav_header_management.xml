@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="180dp"
+    android:background="@drawable/shape_nav_header_bg"
+    android:gravity="center_vertical"
+    android:orientation="vertical"
+    android:padding="24dp">
+
+    <androidx.cardview.widget.CardView
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        app:cardBackgroundColor="#FFFFFF"
+        app:cardCornerRadius="32dp"
+        app:cardElevation="2dp">
+
+        <ImageView
+            android:id="@+id/iv_admin_avatar"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:padding="12dp"
+            android:src="@android:drawable/ic_menu_edit"
+            app:tint="#FFD90E" />
+    </androidx.cardview.widget.CardView>
+
+    <TextView
+        android:id="@+id/tv_admin_role"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="超级管理员"
+        android:textColor="#333333"
+        android:textSize="20sp"
+        android:textStyle="bold" />
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:background="#33000000"
+        android:paddingHorizontal="8dp"
+        android:paddingVertical="2dp"
+        android:orientation="horizontal">
+
+        <TextView
+            android:id="@+id/tv_admin_version"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="System v1.0"
+            android:textColor="#FFFFFF"
+            android:textSize="11sp" />
+    </LinearLayout>
+
+</LinearLayout>

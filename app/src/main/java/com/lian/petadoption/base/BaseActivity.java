@@ -8,6 +8,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
@@ -19,14 +20,14 @@ import com.lian.petadoption.config.AppConfig;
 import com.lian.petadoption.database.DatabaseHelper;
 
 public abstract class BaseActivity extends AppCompatActivity {
-    protected Context context;
+    protected Context mContext;
     protected DatabaseHelper databaseHelper;
     protected SharedPreferences sharedPreferences;
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState){
         super.onCreate(savedInstanceState);
-        context=this;
+        mContext=this;
 
         // 设置布局
         setContentView(getLayoutId());
@@ -52,15 +53,29 @@ public abstract class BaseActivity extends AppCompatActivity {
         window.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
     }
 
+    //通用标题栏设置 (需布局文件中包含 id: tv_title 和 iv_back)
+    protected void setToolbarTitle(String title) {
+        TextView tvTitle = findViewById(R.id.tv_title);
+        View ivBack = findViewById(R.id.iv_back);
+
+        if (tvTitle != null) {
+            tvTitle.setText(title);
+        }
+
+        if (ivBack != null) {
+            ivBack.setOnClickListener(v -> finish());
+        }
+    }
+
     protected abstract int getLayoutId();
 
     // 显示 Toast
     protected void showToast(String msg){
-        runOnUiThread(()-> Toast.makeText(context,msg,Toast.LENGTH_SHORT).show());
+        runOnUiThread(()-> Toast.makeText(mContext,msg,Toast.LENGTH_SHORT).show());
     }
 
     // 界面跳转
     protected void navigateTo(Class<?> cls){
-        startActivity(new Intent(context,cls));
+        startActivity(new Intent(mContext,cls));
     }
 }

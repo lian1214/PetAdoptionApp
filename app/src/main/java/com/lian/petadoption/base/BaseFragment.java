@@ -16,7 +16,7 @@ import com.lian.petadoption.config.AppConfig;
 import com.lian.petadoption.database.DatabaseHelper;
 
 public abstract class BaseFragment extends Fragment {
-    protected Context context;
+    protected Context mContext;
     protected View view;
     protected DatabaseHelper databaseHelper;
     protected SharedPreferences sharedPreferences;
@@ -24,7 +24,7 @@ public abstract class BaseFragment extends Fragment {
     @Override
     public void onAttach(@Nullable Context context){
         super.onAttach(context);
-        this.context=context;
+        mContext=context;
     }
 
     @Nullable
@@ -33,9 +33,9 @@ public abstract class BaseFragment extends Fragment {
         if (view==null)
             view=layoutInflater.inflate(getLayoutId(),viewGroup,false);
         // 初始化工具类
-        if (context!=null){
-            databaseHelper=new DatabaseHelper(context);
-            sharedPreferences=context.getSharedPreferences(AppConfig.SP.NAME,Context.MODE_PRIVATE);
+        if (mContext!=null){
+            databaseHelper=new DatabaseHelper(mContext);
+            sharedPreferences=mContext.getSharedPreferences(AppConfig.SP.NAME,Context.MODE_PRIVATE);
         }
 
         initView(view);
@@ -57,12 +57,12 @@ public abstract class BaseFragment extends Fragment {
     protected abstract int getLayoutId();
 
     protected void showToast(String msg){
-        if (context!=null)
-            Toast.makeText(context,msg,Toast.LENGTH_SHORT).show();
+        if (mContext!=null)
+            Toast.makeText(mContext,msg,Toast.LENGTH_SHORT).show();
     }
 
     protected void navigateTo(Class<?> cls){
-        if (context!=null)
-            startActivity(new Intent(context,cls));
+        if (mContext!=null)
+            startActivity(new Intent(mContext,cls));
     }
 }

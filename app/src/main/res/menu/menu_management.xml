@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <group android:checkableBehavior="single">
+        <item
+            android:id="@+id/nav_home"
+            android:icon="@android:drawable/ic_menu_today"
+            android:title="首页看板" />
+
+        <item
+            android:id="@+id/nav_user_manage"
+            android:icon="@android:drawable/ic_menu_view"
+            android:title="用户管理" />
+
+        <item
+            android:id="@+id/nav_pet_manage"
+            android:icon="@android:drawable/ic_menu_share"
+            android:title="领养宠物管理" />
+
+        <item
+            android:id="@+id/nav_knowledge_manage"
+            android:icon="@android:drawable/ic_menu_sort_by_size"
+            android:title="知识库管理" />
+    </group>
+
+    <item android:title="账户操作">
+        <menu>
+            <item
+                android:id="@+id/nav_logout"
+                android:icon="@android:drawable/ic_lock_power_off"
+                android:title="退出登录" />
+        </menu>
+    </item>
+
+</menu>

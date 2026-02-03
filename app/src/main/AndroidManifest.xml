@@ -12,7 +12,64 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.PetAdoption">
         <activity
-            android:name=".MainActivity"
+            android:name=".activity.KnowledgeDetailActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.AdoptionCheckInActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.BaseKnowledgeActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.AdoptKnowledgeActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.PetKnowledgeActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.CheckInDetailActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.ApplicationActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.PetDetailActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.PublishAdoptionActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.ApproveDetailActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.MyFavoriteActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.MyCheckInActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.MyPublishActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.MyApplyActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.SettingsActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.ManagementActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.TabBarActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.RegistrationActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.LoginActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activity.MainActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

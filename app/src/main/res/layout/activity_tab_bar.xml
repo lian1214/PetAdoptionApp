@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/main"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#F5F5F5"
+    tools:context=".activity.TabBarActivity">
+
+    <FrameLayout
+        android:id="@+id/fl_container"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1px"
+        android:background="#EEEEEE" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:background="@color/white"
+        android:elevation="8dp"
+        android:baselineAligned="false">
+
+        <Button
+            android:id="@+id/btn_tab_home"
+            style="@style/TabButtonStyle"
+            android:text="首页"
+            android:drawableTop="@drawable/tab_selector_home" />
+
+        <Button
+            android:id="@+id/btn_tab_adoption"
+            style="@style/TabButtonStyle"
+            android:text="动态"
+            android:drawableTop="@drawable/tab_selector_adoption_list" />
+
+        <FrameLayout
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1">
+
+            <Button
+                android:id="@+id/btn_tab_message"
+                style="@style/TabButtonStyle"
+                android:layout_width="match_parent"
+                android:text="消息"
+                android:drawableTop="@drawable/tab_selector_message" />
+
+            <View
+                android:id="@+id/view_msg_badge"
+                android:layout_width="8dp"
+                android:layout_height="8dp"
+                android:layout_gravity="top|center_horizontal"
+                android:layout_marginTop="6dp"
+                android:layout_marginStart="12dp"
+                android:background="@drawable/shape_red_dot"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <Button
+            android:id="@+id/btn_tab_mine"
+            style="@style/TabButtonStyle"
+            android:text="我的"
+            android:drawableTop="@drawable/tab_selector_mine" />
+
+    </LinearLayout>
+
+</LinearLayout>

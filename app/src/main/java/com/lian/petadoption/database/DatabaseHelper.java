@@ -8,12 +8,15 @@ import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
 import android.util.Log;
 
 import com.lian.petadoption.config.AppConfig;
 import com.lian.petadoption.dao.Adopt;
 import com.lian.petadoption.dao.ApplyInfo;
 import com.lian.petadoption.dao.CheckIn;
+import com.lian.petadoption.dao.Comment;
+import com.lian.petadoption.dao.Knowledge;
 import com.lian.petadoption.dao.User; // 确保你有 User 实体类，如果没有请创建或使用 Map
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -250,6 +253,71 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         });
     }
 
+    /**
+     * 更新用户信息 (支持修改账号、密码、昵称、简介)
+     * @param oldAccount 旧账号 (用于查找)
+     * @param newAccount 新账号 (若不修改传 null 或与旧账号相同)
+     * @param newNick    新昵称 (若不修改传 null)
+     * @param newBio     新简介 (若不修改传 null)
+     * @param newPassword 新密码 (若不修改传 null)
+     */
+    public void updateUserProfile(String oldAccount, String newAccount, String newNick, String newBio, String newPassword, DataCallback<Boolean> callback) {
+        executor.execute(() -> {
+            SQLiteDatabase db = getWritableDatabase();
+            db.beginTransaction(); // 开启事务
+            try {
+                ContentValues values = new ContentValues();
+
+                // 1. 处理账号变更 (如果传了且不一样)
+                boolean isAccountChanged = newAccount != null && !newAccount.isEmpty() && !newAccount.equals(oldAccount);
+                if (isAccountChanged) {
+                    // 检查新账号是否已存在
+                    if (isUserExistSync(newAccount)) {
+                        postFail(callback, "新用户名已存在");
+                        db.endTransaction();
+                        return;
+                    }
+                    values.put("u_name", newAccount);
+                }
+
+                // 2. 处理其他字段
+                if (newNick != null) values.put("u_nickname", newNick);
+                if (newBio != null) values.put("u_info", newBio);
+                if (newPassword != null && !newPassword.isEmpty()) {
+                    values.put("u_psd", newPassword);
+                }
+
+                // 3. 执行 User 表更新
+                int rows = db.update(TABLE_USER, values, "u_name = ?", new String[]{oldAccount});
+
+                // 4. 如果账号变了，需要同步更新关联表 (比如发布的宠物 sendName)
+                if (rows > 0 && isAccountChanged) {
+                    ContentValues adoptValues = new ContentValues();
+                    adoptValues.put("sendName", newAccount);
+                    db.update(TABLE_ADOPT, adoptValues, "sendName = ?", new String[]{oldAccount});
+
+                    // 同步更新申请表、打卡表等 (如果有用到 username 作为外键)
+                    ContentValues applyValues = new ContentValues();
+                    applyValues.put("m_name", newAccount);
+                    db.update(TABLE_MY_APPLY, applyValues, "m_name = ?", new String[]{oldAccount});
+
+                    applyValues.clear();
+                    applyValues.put("m_pname", newAccount);
+                    db.update(TABLE_MY_APPLY, applyValues, "m_pname = ?", new String[]{oldAccount});
+                }
+
+                db.setTransactionSuccessful(); // 标记成功
+                postSuccess(callback, rows > 0);
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                postFail(callback, "更新失败: " + e.getMessage());
+            } finally {
+                db.endTransaction(); // 提交或回滚
+            }
+        });
+    }
+
     // 内部同步检查用户是否存在
     private boolean isUserExistSync(String username) {
         SQLiteDatabase db = getReadableDatabase();
@@ -335,6 +403,123 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             }
             cursor.close();
             postSuccess(callback, list);
+        });
+    }
+
+    /**
+     * 获取所有待领养宠物 (异步)
+     * 替代了原有的同步 getPendingAdopts 方法
+     */
+    public void getPendingAdopts(DataCallback<List<Adopt>> callback) {
+        executor.execute(() -> {
+            List<Adopt> list = new ArrayList<>();
+            SQLiteDatabase db = getReadableDatabase();
+
+            // 逻辑说明：
+            // 查询所有状态 不是 "已领养" 的宠物。
+            // 这样 "待领养"、"展示中" 等状态都会被查出来。
+            // ORDER BY _id DESC 保证最新发布的显示在最前面。
+            String sql = "SELECT * FROM " + TABLE_ADOPT +
+                    " WHERE state != ? ORDER BY " + COL_ID + " DESC";
+
+            // AppConfig.State.PET_ADOPTED 通常定义为 "已领养"
+            Cursor cursor = db.rawQuery(sql, new String[]{AppConfig.State.PET_ADOPTED});
+
+            while (cursor.moveToNext()) {
+                // 复用 cursorToAdopt 方法解析数据
+                list.add(cursorToAdopt(cursor));
+            }
+            cursor.close();
+
+            // 回调主线程
+            postSuccess(callback, list);
+        });
+    }
+
+    /**
+     * 根据 ID 获取单只宠物的详细领养信息 (异步)
+     * @param id 宠物在数据库中的 _id
+     */
+    public void getAdoptById(int id, DataCallback<Adopt> callback) {
+        executor.execute(() -> {
+            SQLiteDatabase db = getReadableDatabase();
+            Adopt adopt = null;
+            Cursor cursor = null;
+            try {
+                String sql = "SELECT * FROM " + TABLE_ADOPT + " WHERE " + COL_ID + " = ?";
+                cursor = db.rawQuery(sql, new String[]{String.valueOf(id)});
+
+                if (cursor != null && cursor.moveToFirst()) {
+                    // 复用现有的 cursorToAdopt 方法（注意：需要确保 cursorToAdopt 读取了所有详情字段）
+                    // 或者在这里单独写全量读取逻辑
+                    adopt = new Adopt();
+                    adopt.setId(cursor.getInt(cursor.getColumnIndexOrThrow(COL_ID)));
+                    adopt.setSendName(cursor.getString(cursor.getColumnIndexOrThrow("sendName")));
+                    adopt.setPetName(cursor.getString(cursor.getColumnIndexOrThrow("petName")));
+                    adopt.setBreed(cursor.getString(cursor.getColumnIndexOrThrow("breed")));
+                    adopt.setGender(cursor.getString(cursor.getColumnIndexOrThrow("gender")));
+                    adopt.setAge(cursor.getString(cursor.getColumnIndexOrThrow("age")));
+
+                    // 详情字段
+                    adopt.setDeworming(getCursorString(cursor, "deworming"));
+                    adopt.setSterilization(getCursorString(cursor, "sterilization"));
+                    adopt.setVaccine(getCursorString(cursor, "vaccine"));
+                    adopt.setCycle(getCursorString(cursor, "cycle"));
+                    adopt.setAddress(getCursorString(cursor, "address"));
+                    adopt.setRemark(getCursorString(cursor, "remark"));
+                    adopt.setPic(getCursorString(cursor, "pic"));
+                    adopt.setState(getCursorString(cursor, "state"));
+                    adopt.setPhone(getCursorString(cursor, "phone"));
+                    adopt.setTime(getCursorString(cursor, "time"));
+                }
+            } catch (Exception e) {
+                e.printStackTrace();
+            } finally {
+                if (cursor != null) cursor.close();
+            }
+
+            // 回调
+            if (adopt != null) {
+                postSuccess(callback, adopt);
+            } else {
+                postFail(callback, "未找到该宠物信息");
+            }
+        });
+    }
+
+    /**
+     * 根据申请ID获取申请详情 (用于 ApproveDetailActivity)
+     */
+    public void getApplyDetailById(int applyId, DataCallback<ApplyInfo> callback) {
+        executor.execute(() -> {
+            SQLiteDatabase db = getReadableDatabase();
+            ApplyInfo info = null;
+            // 不需要联表，只查申请详情
+            Cursor cursor = db.rawQuery("SELECT * FROM " + TABLE_MY_APPLY + " WHERE " + COL_ID + " = ?", new String[]{String.valueOf(applyId)});
+
+            if (cursor != null && cursor.moveToFirst()) {
+                info = new ApplyInfo();
+                info.setId(cursor.getInt(cursor.getColumnIndexOrThrow(COL_ID)));
+                // 填充所有审核需要的字段 (真实姓名、年龄、图片等)
+                // 这里为了方便，可以把 ApplyInfo 类扩展一下，或者用 Map，或者直接在 Adapter/Activity 里用 cursorToApplyInfo 解析基础字段
+                // 关键字段：
+                info.setName(getCursorString(cursor, "m_name"));       // 申请人账号
+                info.setRealName(getCursorString(cursor, "m_app_name")); // 真实姓名
+                info.setAge(getCursorString(cursor, "m_age"));
+                info.setGender(getCursorString(cursor, "m_gender"));
+                info.setPhone(getCursorString(cursor, "m_pphone"));
+                info.setIdCard(getCursorString(cursor, "m_idcard"));
+                info.setAddress(getCursorString(cursor, "m_address"));
+                info.setIncomeSource(getCursorString(cursor, "m_income_source"));
+                info.setIntent(getCursorString(cursor, "m_intent"));
+                info.setLivePics(getCursorString(cursor, "m_live_pics"));
+                info.setIncomePics(getCursorString(cursor, "m_income_pics"));
+                info.setState(getCursorString(cursor, "m_state"));
+            }
+            if (cursor != null) cursor.close();
+
+            if (info != null) postSuccess(callback, info);
+            else postFail(callback, "未找到申请记录");
         });
     }
 
@@ -465,6 +650,255 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         });
     }
 
+    // 知识库模块
+    /**
+     * 首页知识推荐（随机获取）
+     */
+    public void getKnowledgeList(String baseType, DataCallback<List<Knowledge>> callback) {
+        executor.execute(() -> {
+            List<Knowledge> list = new ArrayList<>();
+            SQLiteDatabase db = this.getReadableDatabase();
+
+            // 关键修改：WHERE type = 'pet' OR type LIKE 'pet:%'
+            String sql = "SELECT * FROM " + TABLE_KNOWLEDGE +
+                    " WHERE type = ? OR type LIKE ? " +
+                    " ORDER BY is_official DESC, _id DESC";
+
+            // 参数对应：精确匹配 baseType，或者匹配以 "baseType:" 开头的
+            Cursor cursor = db.rawQuery(sql, new String[]{baseType, baseType + ":%"});
+
+            while (cursor != null && cursor.moveToNext()) {
+                list.add(cursorToKnowledge(cursor));
+            }
+            if(cursor != null) cursor.close();
+            postSuccess(callback, list);
+        });
+    }
+
+    public void addKnowledge(String type, String username, String title, String content, String pic, boolean isOfficial, DataCallback<Boolean> callback) {
+        executor.execute(() -> {
+            SQLiteDatabase db = this.getWritableDatabase();
+            ContentValues cv = new ContentValues();
+            cv.put("type", type);
+            cv.put("username", username);
+            cv.put("title", title);
+            cv.put("content", content);
+            cv.put("pics", pic);
+            cv.put("is_official", isOfficial ? 1 : 0);
+            cv.put("time", getNowTime());
+            long ret = db.insert(TABLE_KNOWLEDGE, null, cv);
+            if (ret != -1 && callback != null) postSuccess(callback, true);
+            else if (callback != null) postFail(callback, "发布失败");
+        });
+    }
+
+    public void searchKnowledge(String baseType, String keyword, DataCallback<List<Knowledge>> callback) {
+        executor.execute(() -> {
+            List<Knowledge> list = new ArrayList<>();
+            SQLiteDatabase db = getReadableDatabase();
+
+            // 关键修改：type LIKE 'pet%' 匹配 'pet' 和 'pet:xxx'
+            String sql = "SELECT * FROM " + TABLE_KNOWLEDGE +
+                    " WHERE type LIKE ? AND (title LIKE ? OR content LIKE ? OR type LIKE ?) " +
+                    " ORDER BY is_official DESC, _id DESC";
+
+            // 参数：type前缀，标题关键词，内容关键词，标签关键词
+            String[] args = new String[]{
+                    baseType + "%",
+                    "%" + keyword + "%",
+                    "%" + keyword + "%",
+                    "%" + keyword + "%"
+            };
+
+            Cursor cursor = db.rawQuery(sql, args);
+            while (cursor.moveToNext()) list.add(cursorToKnowledge(cursor));
+            cursor.close();
+            postSuccess(callback, list);
+        });
+    }
+
+    public void getRandomMixedKnowledge(int count, DataCallback<List<Knowledge>> callback) {
+        executor.execute(() -> {
+            List<Knowledge> list = new ArrayList<>();
+            SQLiteDatabase db = getReadableDatabase();
+            String sql = "SELECT * FROM " + TABLE_KNOWLEDGE + " ORDER BY RANDOM() LIMIT " + count;
+            Cursor cursor = db.rawQuery(sql, null);
+            while (cursor.moveToNext()) list.add(cursorToKnowledge(cursor));
+            cursor.close();
+            postSuccess(callback, list);
+        });
+    }
+
+    public int getKnowledgeLikeCount(int kId) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT COUNT(*) FROM " + TABLE_KNOWLEDGE_LIKE + " WHERE knowledge_id = ?", new String[]{String.valueOf(kId)});
+        int count = 0;
+        if (cursor.moveToFirst()) count = cursor.getInt(0);
+        cursor.close();
+        return count;
+    }
+
+    public boolean isKnowledgeLiked(int kId, String username) {
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT * FROM " + TABLE_KNOWLEDGE_LIKE + " WHERE knowledge_id = ? AND username = ?",
+                new String[]{String.valueOf(kId), username});
+        boolean liked = cursor.getCount() > 0;
+        cursor.close();
+        return liked;
+    }
+
+    public void toggleKnowledgeLike(int kId, String username, DataCallback<Boolean> callback) {
+        executor.execute(() -> {
+            SQLiteDatabase db = getWritableDatabase();
+            String where = "knowledge_id=? AND username=?";
+            String[] args = new String[]{String.valueOf(kId), username};
+            Cursor c = db.query(TABLE_KNOWLEDGE_LIKE, null, where, args, null, null, null);
+            boolean isLiked;
+            if (c.moveToFirst()) {
+                db.delete(TABLE_KNOWLEDGE_LIKE, where, args);
+                isLiked = false;
+            } else {
+                ContentValues cv = new ContentValues();
+                cv.put("knowledge_id", kId);
+                cv.put("username", username);
+                db.insert(TABLE_KNOWLEDGE_LIKE, null, cv);
+                isLiked = true;
+            }
+            c.close();
+            postSuccess(callback, isLiked);
+        });
+    }
+
+    public void addKnowledgeComment(int kId, String username, String content, DataCallback<Boolean> callback) {
+        executor.execute(() -> {
+            SQLiteDatabase db = getWritableDatabase();
+            ContentValues cv = new ContentValues();
+            cv.put("knowledge_id", kId);
+            cv.put("username", username);
+            cv.put("content", content);
+            cv.put("time", getNowTime());
+            long ret = db.insert(TABLE_KNOWLEDGE_COMMENT, null, cv);
+            if (ret != -1) postSuccess(callback, true);
+            else postFail(callback, "评论失败");
+        });
+    }
+
+    public void getKnowledgeComments(int kId, DataCallback<List<Comment>> callback) {
+        executor.execute(() -> {
+            List<Comment> list = new ArrayList<>();
+            SQLiteDatabase db = getReadableDatabase();
+            // 联表查询：获取评论者头像和昵称 (与打卡评论逻辑一致)
+            String sql = "SELECT c.*, u.u_nickname, u.u_head FROM " + TABLE_KNOWLEDGE_COMMENT + " c " +
+                    "LEFT JOIN " + TABLE_USER + " u ON c.username = u.u_name " +
+                    "WHERE c.knowledge_id = ? ORDER BY c._id DESC";
+            Cursor cursor = db.rawQuery(sql, new String[]{String.valueOf(kId)});
+            while (cursor.moveToNext()) {
+                Comment c = new Comment();
+                c.setId(cursor.getInt(cursor.getColumnIndexOrThrow(COL_ID)));
+                c.setUsername(getCursorString(cursor, "username"));
+                c.setContent(getCursorString(cursor, "content"));
+                c.setTime(getCursorString(cursor, "time"));
+                String nick = getCursorString(cursor, "u_nickname");
+                c.setNickname(TextUtils.isEmpty(nick) ? c.getUsername() : nick);
+                c.setAvatar(getCursorString(cursor, "u_head"));
+                list.add(c);
+            }
+            cursor.close();
+            postSuccess(callback, list);
+        });
+    }
+
+    // 消息通知模块
+    /**
+     * 获取用户所有消息 (申请人视角 + 发布者视角)
+     */
+    public void getMyAllMessages(String username, DataCallback<List<ApplyInfo>> callback) {
+        executor.execute(() -> {
+            List<ApplyInfo> list = new ArrayList<>();
+            SQLiteDatabase db = getReadableDatabase();
+
+            // 复杂查询：
+            // 1. 我是发布者 (m_pname = me) -> 收到申请
+            // 2. 我是申请人 (m_name = me) 且 状态不是"待审核" -> 收到审批结果
+            // 排除已删除的 (m_is_deleted = 0)
+            // 按未读优先，然后按时间倒序
+            String sql = "SELECT a.*, p.petName, u.u_head as applicant_avatar " +
+                    "FROM " + TABLE_MY_APPLY + " a " +
+                    "LEFT JOIN " + TABLE_ADOPT + " p ON a.m_vid = p._id " +
+                    "LEFT JOIN " + TABLE_USER + " u ON a.m_name = u.u_name " +
+                    "WHERE (a.m_pname = ? OR (a.m_name = ? AND a.m_state != ?)) " +
+                    "AND a.m_is_deleted = 0 " +
+                    "ORDER BY a.m_read_state ASC, a._id DESC";
+
+            Cursor cursor = db.rawQuery(sql, new String[]{username, username, AppConfig.State.APPLY_PENDING});
+
+            if (cursor != null) {
+                while (cursor.moveToNext()) {
+                    ApplyInfo info = new ApplyInfo();
+                    // 基础字段
+                    info.setId(cursor.getInt(cursor.getColumnIndexOrThrow(COL_ID)));
+                    info.setPetName(getCursorString(cursor, "petName"));
+                    info.setState(getCursorString(cursor, "m_state"));
+                    info.setTime(getCursorString(cursor, "m_time"));
+
+                    // 关系字段
+                    info.setName(getCursorString(cursor, "m_name")); // 申请人
+                    info.setPublisherName(getCursorString(cursor, "m_pname")); // 发布者
+                    info.setApplicantAvatar(getCursorString(cursor, "applicant_avatar")); // 申请人头像
+                    info.setReadState(cursor.getInt(cursor.getColumnIndexOrThrow("m_read_state")));
+
+                    list.add(info);
+                }
+                cursor.close();
+            }
+            postSuccess(callback, list);
+        });
+    }
+
+    /**
+     * 获取未读消息数 (用于 TabBar 红点)
+     */
+    public void getUnreadMessageCount(String username, DataCallback<Integer> callback) {
+        executor.execute(() -> {
+            SQLiteDatabase db = getReadableDatabase();
+            // 逻辑同上，只统计 count
+            String sql = "SELECT COUNT(*) FROM " + TABLE_MY_APPLY + " WHERE m_is_deleted = 0 AND m_read_state = 0 AND (" +
+                    "(m_pname = ? AND m_state = ?) OR " + // 发布者视角：收到待审核的申请
+                    "(m_name = ? AND m_state != ?))";     // 申请人视角：收到已处理的结果
+
+            Cursor cursor = db.rawQuery(sql, new String[]{username, AppConfig.State.APPLY_PENDING, username, AppConfig.State.APPLY_PENDING});
+            int count = 0;
+            if (cursor.moveToFirst()) count = cursor.getInt(0);
+            cursor.close();
+            postSuccess(callback, count);
+        });
+    }
+
+    /**
+     * 标记消息为已读
+     */
+    public void markAsRead(int id) {
+        executor.execute(() -> {
+            SQLiteDatabase db = getWritableDatabase();
+            ContentValues cv = new ContentValues();
+            cv.put("m_read_state", 1);
+            db.update(TABLE_MY_APPLY, cv, COL_ID + " = ?", new String[]{String.valueOf(id)});
+            // 不需要回调
+        });
+    }
+
+    /**
+     * 清空所有已读消息 (逻辑删除)
+     */
+    public void deleteAllReadMessages() {
+        executor.execute(() -> {
+            SQLiteDatabase db = getWritableDatabase();
+            ContentValues cv = new ContentValues();
+            cv.put("m_is_deleted", 1);
+            db.update(TABLE_MY_APPLY, cv, "m_read_state = 1", null);
+        });
+    }
+
     // 社交模块
     /**
      * 发布打卡
@@ -495,6 +929,22 @@ public class DatabaseHelper extends SQLiteOpenHelper {
             List<CheckIn> list = new ArrayList<>();
             SQLiteDatabase db = getReadableDatabase();
             Cursor cursor = db.query(TABLE_CHECKIN, null, null, null, null, null, COL_ID + " DESC");
+            while (cursor.moveToNext()) {
+                list.add(cursorToCheckIn(cursor));
+            }
+            cursor.close();
+            postSuccess(callback, list);
+        });
+    }
+
+    /**
+     * 获取我的打卡记录
+     */
+    public void getMyCheckInList(String username, DataCallback<List<CheckIn>> callback) {
+        executor.execute(() -> {
+            List<CheckIn> list = new ArrayList<>();
+            SQLiteDatabase db = getReadableDatabase();
+            Cursor cursor = db.query(TABLE_CHECKIN, null, "username=?", new String[]{username}, null, null, COL_ID + " DESC");
             while (cursor.moveToNext()) {
                 list.add(cursorToCheckIn(cursor));
             }
@@ -535,29 +985,302 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         });
     }
 
-    // 统计与图表
+    /**
+     * [同步] 获取某条打卡动态的点赞数
+     */
+    public int getCheckInLikeCount(int checkInId) {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT like_count FROM " + TABLE_CHECKIN + " WHERE " + COL_ID + "=?",
+                new String[]{String.valueOf(checkInId)});
+        int count = 0;
+        if (cursor.moveToFirst()) {
+            count = cursor.getInt(0);
+        }
+        cursor.close();
+        return count;
+    }
+
+    /**
+     * [同步] 判断用户是否给某条动态点过赞
+     */
+    public boolean isCheckInLiked(int checkInId, String username) {
+        if (username == null || username.isEmpty()) return false;
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor cursor = db.query(TABLE_CHECKIN_LIKE, null, "check_in_id=? AND username=?",
+                new String[]{String.valueOf(checkInId), username}, null, null, null);
+        boolean liked = cursor.getCount() > 0;
+        cursor.close();
+        return liked;
+    }
+
+    /**
+     * 切换收藏状态 (如果已收藏则取消，未收藏则添加)
+     */
+    public void toggleFavorite(String username, int petId, DataCallback<Boolean> callback) {
+        executor.execute(() -> {
+            SQLiteDatabase db = getWritableDatabase();
+            // 1. 查询是否存在
+            Cursor c = db.query(TABLE_FAVORITE, null, "username=? AND pet_id=?",
+                    new String[]{username, String.valueOf(petId)}, null, null, null);
+            boolean exists = c.moveToFirst();
+            c.close();
+
+            boolean isNowFav;
+            if (exists) {
+                // 2. 存在 -> 删除
+                db.delete(TABLE_FAVORITE, "username=? AND pet_id=?", new String[]{username, String.valueOf(petId)});
+                isNowFav = false;
+            } else {
+                // 3. 不存在 -> 添加
+                ContentValues cv = new ContentValues();
+                cv.put("username", username);
+                cv.put("pet_id", petId);
+                db.insert(TABLE_FAVORITE, null, cv);
+                isNowFav = true;
+            }
+            // 返回当前的最新状态
+            postSuccess(callback, isNowFav);
+        });
+    }
+
+    /**
+     * [同步] 判断是否已收藏
+     */
+    public boolean isFavorite(String username, int petId) {
+        SQLiteDatabase db = getReadableDatabase();
+        Cursor cursor = db.query(TABLE_FAVORITE, null, "username=? AND pet_id=?",
+                new String[]{username, String.valueOf(petId)}, null, null, null);
+        boolean isFav = cursor.getCount() > 0;
+        cursor.close();
+        return isFav;
+    }
+
+    /**
+     * 获取我的收藏列表 (联表查询)
+     */
+    public void getMyFavoriteList(String username, DataCallback<List<Adopt>> callback) {
+        executor.execute(() -> {
+            List<Adopt> list = new ArrayList<>();
+            SQLiteDatabase db = getReadableDatabase();
+            String sql = "SELECT a.* FROM " + TABLE_ADOPT + " a " +
+                    "INNER JOIN " + TABLE_FAVORITE + " f ON a._id = f.pet_id " +
+                    "WHERE f.username = ? ORDER BY f._id DESC";
+            Cursor cursor = db.rawQuery(sql, new String[]{username});
+            while (cursor.moveToNext()) {
+                list.add(cursorToAdopt(cursor));
+            }
+            cursor.close();
+            postSuccess(callback, list);
+        });
+    }
+
+    /**
+     * 取消收藏
+     */
+    public void deleteFavorite(String username, int petId, DataCallback<Boolean> callback) {
+        executor.execute(() -> {
+            SQLiteDatabase db = getWritableDatabase();
+            // 删除条件：用户名 AND 宠物ID
+            int rows = db.delete(TABLE_FAVORITE, "username = ? AND pet_id = ?",
+                    new String[]{username, String.valueOf(petId)});
+
+            if (rows > 0) {
+                postSuccess(callback, true);
+            } else {
+                postFail(callback, "取消失败或未找到记录");
+            }
+        });
+    }
+
+    // 评论模块
+
+    /**
+     * 添加打卡评论 (异步)
+     */
+    public void addCheckInComment(String username, int punchId, String content, DataCallback<Boolean> callback) {
+        executor.execute(() -> {
+            SQLiteDatabase db = getWritableDatabase();
+            ContentValues cv = new ContentValues();
+            cv.put("check_in_id", punchId);
+            cv.put("username", username);
+            cv.put("content", content);
+            cv.put("time", getNowTime());
+
+            long ret = db.insert(TABLE_CHECKIN_COMMENT, null, cv);
+            if (ret != -1) {
+                postSuccess(callback, true);
+            } else {
+                postFail(callback, "评论失败");
+            }
+        });
+    }
+
+    /**
+     * 获取打卡评论列表 (异步 + 联表查询用户信息)
+     * 解决了在 Adapter 中循环查库导致的卡顿问题
+     */
+    public void getCheckInComments(int punchId, DataCallback<List<Comment>> callback) {
+        executor.execute(() -> {
+            List<Comment> list = new ArrayList<>();
+            SQLiteDatabase db = getReadableDatabase();
+
+            // 联表查询：从 comment 表关联 user 表，获取头像(u_head)和昵称(u_nickname)
+            // c.* 代表评论表所有字段
+            String sql = "SELECT c.*, u.u_nickname, u.u_head " +
+                    "FROM " + TABLE_CHECKIN_COMMENT + " c " +
+                    "LEFT JOIN " + TABLE_USER + " u ON c.username = u.u_name " +
+                    "WHERE c.check_in_id = ? " +
+                    "ORDER BY c._id DESC";
+
+            Cursor cursor = db.rawQuery(sql, new String[]{String.valueOf(punchId)});
+
+            while (cursor.moveToNext()) {
+                Comment c = new Comment();
+                // 基础字段
+                c.setId(cursor.getInt(cursor.getColumnIndexOrThrow(COL_ID)));
+                c.setUsername(getCursorString(cursor, "username"));
+                c.setContent(getCursorString(cursor, "content"));
+                c.setTime(getCursorString(cursor, "time"));
+
+                // 扩展字段 (来自 User 表)
+                String nick = getCursorString(cursor, "u_nickname");
+                c.setNickname(TextUtils.isEmpty(nick) ? c.getUsername() : nick); // 如果没昵称显示账号
+                c.setAvatar(getCursorString(cursor, "u_head"));
+
+                list.add(c);
+            }
+            cursor.close();
+            postSuccess(callback, list);
+        });
+    }
+
+    // 管理员模块
+    /**
+     * 获取所有普通用户
+     */
+    public void getAllUsers(DataCallback<List<User>> callback) {
+        executor.execute(() -> {
+            List<User> list = new ArrayList<>();
+            SQLiteDatabase db = getReadableDatabase();
+            // 排除管理员
+            Cursor cursor = db.query(TABLE_USER, null, "u_name != 'admin'", null, null, null, COL_ID + " DESC");
+            while (cursor.moveToNext()) {
+                list.add(cursorToUser(cursor));
+            }
+            cursor.close();
+            postSuccess(callback, list);
+        });
+    }
+
+    /**
+     * 搜索用户
+     */
+    public void searchUsers(String keyword, DataCallback<List<User>> callback) {
+        executor.execute(() -> {
+            List<User> list = new ArrayList<>();
+            SQLiteDatabase db = getReadableDatabase();
+            String sql = "SELECT * FROM " + TABLE_USER + " WHERE u_name LIKE ? AND u_name != 'admin'";
+            Cursor cursor = db.rawQuery(sql, new String[]{"%" + keyword + "%"});
+            while (cursor.moveToNext()) {
+                list.add(cursorToUser(cursor));
+            }
+            cursor.close();
+            postSuccess(callback, list);
+        });
+    }
+
+    /**
+     * 删除用户 (级联删除相关数据)
+     */
+    public void deleteUser(int userId) {
+        executor.execute(() -> {
+            SQLiteDatabase db = getWritableDatabase();
+            db.delete(TABLE_USER, COL_ID + "=?", new String[]{String.valueOf(userId)});
+            // 可以在这里补充删除该用户发布的宠物、打卡等逻辑
+        });
+    }
+
+    /**
+     * 更新用户状态 (封禁/解封)
+     */
+    public void updateUserStatus(int userId, String newState) {
+        executor.execute(() -> {
+            SQLiteDatabase db = getWritableDatabase();
+            ContentValues cv = new ContentValues();
+            cv.put("u_state", newState);
+            db.update(TABLE_USER, cv, COL_ID + "=?", new String[]{String.valueOf(userId)});
+        });
+    }
+
+
+    // 统计与图表模块
+
+    public long getUserCount() {
+        // 调用下面的 3参数 getCount
+        return getCount(TABLE_USER, "u_name != 'admin'", null);
+    }
+
+    public long getPetCount() {
+        return getCount(TABLE_ADOPT, "state != ?", new String[]{AppConfig.State.PET_ADOPTED});
+    }
+
+    public long getTotalApplicationCount() {
+        return getCount(TABLE_MY_APPLY, null, null);
+    }
+
+    public long getSuccessfulAdoptionCount() {
+        return getCount(TABLE_MY_APPLY, "m_state = ?", new String[]{AppConfig.State.APPLY_PASSED});
+    }
+
+    /**
+     * 【新增】公共重载方法：自动获取数据库连接
+     * 供 getUserCount 等单次查询使用
+     */
+    public long getCount(String table, String where, String[] args) {
+        SQLiteDatabase db = getReadableDatabase();
+        // 复用底层的 4参数 核心逻辑
+        return getCount(db, table, where, args);
+    }
+
+    /**
+     * 【核心】私有方法：需传入 db 对象
+     * 供 getLast7DaysStats 循环中使用，避免反复开关数据库
+     */
+    private long getCount(SQLiteDatabase db, String table, String where, String[] args) {
+        Cursor c = db.query(table, new String[]{"COUNT(*)"}, where, args, null, null, null);
+        long count = 0;
+        if (c != null) {
+            if (c.moveToFirst()) {
+                count = c.getLong(0);
+            }
+            c.close();
+        }
+        return count;
+    }
+
     /**
      * 获取过去7天数据
      */
     public List<Map<String, Object>> getLast7DaysStats() {
         List<Map<String, Object>> result = new ArrayList<>();
+        // 获取一次连接，循环复用
         SQLiteDatabase db = getReadableDatabase();
         SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
 
         for (int i = 6; i >= 0; i--) {
-            // 计算日期
             long timeInMillis = System.currentTimeMillis() - i * 24 * 3600 * 1000L;
             String dateStr = sdf.format(new Date(timeInMillis));
-            String likeDate = dateStr + "%";
+            String likeDate = dateStr + "%"; // SQL 模糊匹配
 
             Map<String, Object> dayData = new HashMap<>();
-            dayData.put("date", dateStr.substring(5)); // MM-dd
+            dayData.put("date", dateStr.substring(5)); // 只取 MM-dd
 
-            // 统计各项数据
+            // 使用 4参数 getCount，传入同一个 db 对象，性能更高
             dayData.put("user", getCount(db, TABLE_USER, "u_time LIKE ?", new String[]{likeDate}));
             dayData.put("pet", getCount(db, TABLE_ADOPT, "time LIKE ?", new String[]{likeDate}));
             dayData.put("apply", getCount(db, TABLE_MY_APPLY, "m_time LIKE ?", new String[]{likeDate}));
-            // 统计成功领养 (状态为已通过且时间匹配)
+
+            // 统计成功领养
             dayData.put("success", getCount(db, TABLE_MY_APPLY, "m_state=? AND m_time LIKE ?",
                     new String[]{AppConfig.State.APPLY_PASSED, likeDate}));
 
@@ -566,28 +1289,40 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         return result;
     }
 
-    private long getCount(SQLiteDatabase db, String table, String where, String[] args) {
-        Cursor c = db.query(table, new String[]{"COUNT(*)"}, where, args, null, null, null);
-        long count = 0;
-        if (c.moveToFirst()) count = c.getLong(0);
-        c.close();
-        return count;
+    // 映射辅助方法
+    @SuppressLint("Range")
+    private User cursorToUser(Cursor cursor) {
+        User user = new User();
+        user.setId(cursor.getInt(cursor.getColumnIndex(COL_ID)));
+        user.setUsername(cursor.getString(cursor.getColumnIndex("u_name")));
+        user.setPassword(cursor.getString(cursor.getColumnIndex("u_psd")));
+        user.setNickname(cursor.getString(cursor.getColumnIndex("u_nickname")));
+        user.setState(cursor.getString(cursor.getColumnIndex("u_state")));
+        user.setHead(cursor.getString(cursor.getColumnIndex("u_head")));
+        user.setInfo(cursor.getString(cursor.getColumnIndex("u_info")));
+        user.setTime(cursor.getString(cursor.getColumnIndex("u_time")));
+        return user;
     }
 
-    // 映射辅助方法
     @SuppressLint("Range")
     private Adopt cursorToAdopt(Cursor cursor) {
         Adopt adopt = new Adopt();
         adopt.setId(cursor.getInt(cursor.getColumnIndex(COL_ID)));
-        adopt.setSendName(cursor.getString(cursor.getColumnIndex("sendName")));
-        adopt.setPetName(cursor.getString(cursor.getColumnIndex("petName")));
-        adopt.setBreed(cursor.getString(cursor.getColumnIndex("breed")));
-        adopt.setGender(cursor.getString(cursor.getColumnIndex("gender")));
-        adopt.setAge(cursor.getString(cursor.getColumnIndex("age")));
-        adopt.setPic(cursor.getString(cursor.getColumnIndex("pic")));
-        adopt.setState(cursor.getString(cursor.getColumnIndex("state")));
-        adopt.setAddress(cursor.getString(cursor.getColumnIndex("address")));
-        adopt.setTime(cursor.getString(cursor.getColumnIndex("time")));
+        adopt.setSendName(getCursorString(cursor, "sendName"));
+        adopt.setPetName(getCursorString(cursor, "petName"));
+        adopt.setBreed(getCursorString(cursor, "breed"));
+        adopt.setGender(getCursorString(cursor, "gender"));
+        adopt.setAge(getCursorString(cursor, "age"));
+        adopt.setPic(getCursorString(cursor, "pic"));
+        adopt.setState(getCursorString(cursor, "state"));
+        adopt.setAddress(getCursorString(cursor, "address"));
+        adopt.setPhone(getCursorString(cursor, "phone"));
+        adopt.setRemark(getCursorString(cursor, "remark"));
+        adopt.setDeworming(getCursorString(cursor, "deworming"));
+        adopt.setSterilization(getCursorString(cursor, "sterilization"));
+        adopt.setVaccine(getCursorString(cursor, "vaccine"));
+        adopt.setCycle(getCursorString(cursor, "cycle"));
+        adopt.setTime(getCursorString(cursor, "time"));
         return adopt;
     }
 
@@ -596,12 +1331,26 @@ public class DatabaseHelper extends SQLiteOpenHelper {
         CheckIn bean = new CheckIn();
         bean.setId(cursor.getInt(cursor.getColumnIndex(COL_ID)));
         bean.setPetId(cursor.getInt(cursor.getColumnIndex("pet_id")));
-        bean.setUsername(cursor.getString(cursor.getColumnIndex("username")));
-        bean.setPetName(cursor.getString(cursor.getColumnIndex("pet_name")));
-        bean.setContent(cursor.getString(cursor.getColumnIndex("content")));
-        bean.setPic(cursor.getString(cursor.getColumnIndex("pic")));
-        bean.setTime(cursor.getString(cursor.getColumnIndex("check_time")));
+        bean.setUsername(getCursorString(cursor, "username"));
+        bean.setPetName(getCursorString(cursor, "pet_name"));
+        bean.setContent(getCursorString(cursor, "content"));
+        bean.setPic(getCursorString(cursor, "pic"));
+        bean.setTime(getCursorString(cursor, "check_time"));
         bean.setLikeCount(cursor.getInt(cursor.getColumnIndex("like_count")));
         return bean;
+    }
+
+    @SuppressLint("Range")
+    private Knowledge cursorToKnowledge(Cursor cursor) {
+        Knowledge k = new Knowledge();
+        k.setId(cursor.getInt(cursor.getColumnIndex(COL_ID)));
+        k.setType(getCursorString(cursor, "type"));
+        k.setTitle(getCursorString(cursor, "title"));
+        k.setContent(getCursorString(cursor, "content"));
+        k.setPics(getCursorString(cursor, "pics"));
+        k.setTime(getCursorString(cursor, "time"));
+        k.setUsername(getCursorString(cursor, "username"));
+        k.setIsOfficial(cursor.getInt(cursor.getColumnIndex("is_official")));
+        return k;
     }
 }

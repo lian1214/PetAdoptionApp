@@ -61,6 +61,16 @@ public abstract class BaseRecyclerAdapter<T, VH extends RecyclerView.ViewHolder>
         return (mList != null && position >= 0 && position < mList.size()) ? mList.get(position) : null;
     }
 
+    public void remove(int position) {
+        if (mList != null && position >= 0 && position < mList.size()) {
+            mList.remove(position);
+            // 移除 Item 动画
+            notifyItemRemoved(position);
+            // 刷新受影响的 Item 索引 (防止后续点击错位)
+            notifyItemRangeChanged(position, mList.size() - position);
+        }
+    }
+
     @Override
     public int getItemCount() {
         return mList != null ? mList.size() : 0;
